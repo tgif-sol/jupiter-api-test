@@ -1,4 +1,9 @@
-import { Connection, Keypair, VersionedTransaction } from "@solana/web3.js";
+import {
+  Connection,
+  Keypair,
+  VersionedTransaction,
+  PublicKey,
+} from "@solana/web3.js";
 import fetch from "cross-fetch";
 import { Wallet } from "@project-serum/anchor";
 import bs58 from "bs58";
@@ -14,12 +19,28 @@ async function main() {
     Keypair.fromSecretKey(bs58.decode(process.env.PRIVATE_KEY || ""))
   );
 
+  // 민트 주소 상수
+  const SOL_MINT = "So11111111111111111111111111111111111111112";
+  const USDC_MINT = "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v";
+
+  // 레퍼럴 퍼블릭 주소
+  const PUBLIC_ADDRESS = "3xzm13sJ45fHG63TLZRUcXMemuKDymMZyKD3FNTGKaZA";
+
   // SOL 0.1로 USDC로 변경, 0.5% 슬리피지
   const quoteResponse = await (
     await fetch(
-      `https://quote-api.jup.ag/v6/quote?inputMint=So11111111111111111111111111111111111111112&outputMint=EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v&amount=10000000&slippageBps=50`
+      `https://quote-api.jup.ag/v6/quote?inputMint=${SOL_MINT}&outputMint=${USDC_MINT}&amount=10000000&slippageBps=100&platformFeeBps=20`
     )
   ).json();
+
+  const [feeAccount] = await PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("referral_ata"),
+      new PublicKey(PUBLIC_ADDRESS).toBuffer(),
+      new PublicKey(USDC_MINT).toBuffer(),
+    ],
+    new PublicKey("REFER4ZgmyYx9c6He5XfaTMiGfdLwRnkV4RPp9t9iF3") // 레퍼럴 프로그램
+  );
 
   // get serialized transactions for the swap
   const { swapTransaction } = await (
@@ -32,8 +53,7 @@ async function main() {
         quoteResponse,
         userPublicKey: wallet.publicKey.toString(),
         wrapAndUnwrapSol: true,
-        // Todo: feeAccount의 퍼블릭키는 여기에 넣는 듯
-        // feeAccount: "fee_account_public_key"
+        feeAccount,
       }),
     })
   ).json();
